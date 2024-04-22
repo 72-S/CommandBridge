@@ -2,7 +2,6 @@ package org.commandbridge;
 
 import dev.jorel.commandapi.CommandAPIBukkitConfig;
 import dev.jorel.commandapi.CommandAPICommand;
-import dev.jorel.commandapi.CommandAPIConfig;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;

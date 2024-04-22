@@ -1,6 +1,6 @@
 package org.commandbridge;
 
-import dev.jorel.commandapi.CommandAPI;
+
 import dev.jorel.commandapi.CommandAPICommand;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
