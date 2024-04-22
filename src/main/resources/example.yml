@@ -1,0 +1,4 @@
+name: join
+enabled: true
+commands:
+  - say HI

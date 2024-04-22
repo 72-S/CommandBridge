@@ -1,0 +1,4 @@
+name: CommandBridge
+version: '${project.version}'
+main: org.commandbridge.CommandBridge
+api-version: '1.20'
