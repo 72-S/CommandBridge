@@ -44,8 +44,8 @@
               <relocations>
                   <relocation>
                       <pattern>dev.jorel.commandapi</pattern>
-                      <!-- TODO: Change this to my own package name -->
-                      <shadedPattern>org.commandbridge.CommandBridge</shadedPattern>
+                      <!-- TODO: Change this  -->
+                      <shadedPattern>org.72S.CommandBridge</shadedPattern>
                   </relocation>
               </relocations>
           </configuration>
