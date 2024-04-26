@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class LoadScripts {
 
@@ -120,11 +121,11 @@ public class LoadScripts {
                         boolean waitForOnline = (boolean) cmdData.getOrDefault("wait-until-player-is-online", false);
 
                         if (delay > 0) {
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0)))
                                     .delay(delay, TimeUnit.SECONDS)
                                     .schedule();
                         } else {
-                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player);
+                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0));
                         }
                     }
                     return 1;
@@ -141,36 +142,44 @@ public class LoadScripts {
         return command.replace("%player%", player.getUsername());
     }
 
-    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage) {
+    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage, AtomicInteger timeElapsed) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
             if (waitForOnline) {
-                // Überprüft, ob der Spieler online ist und führt den Befehl aus oder plant eine erneute Überprüfung
                 serverConnection.getPlayersConnected().stream()
-                        .filter(player -> player.getUsername().equals(command.split(" ")[1])) // Annahme: Der Spielername ist das erste Argument nach dem Befehl.
+                        .filter(player -> player.getUsername().equals(command.split(" ")[1])) // Der Spielername ist das erste Argument im Befehl.
                         .findFirst()
                         .ifPresentOrElse(player -> {
                             sendCommandToBukkit(command, targetServerId, targetExecutor);
                             verboseLogger.info("Executing command on server " + targetServerId + ": " + command);
                         }, () -> {
-                            // Spieler ist nicht online, warte und versuche es erneut.
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage))
-                                    .delay(1, TimeUnit.SECONDS)
-                                    .schedule();
-                            verboseLogger.info("Waiting for player to be online on server "+ targetServerId + ": " +  command);
+                            if (timeElapsed.getAndIncrement() < 20) {
+                                server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage, timeElapsed))
+                                        .delay(1, TimeUnit.SECONDS)
+                                        .schedule();
+                                verboseLogger.info("Waiting for player to be online on server " + targetServerId + ": " + command);
+                            } else {
+                                playerMessage.sendMessage(Component.text("Timeout reached. Player not online within 30 seconds on server " + targetServerId, net.kyori.adventure.text.format.NamedTextColor.RED));
+                                verboseLogger.warn("Timeout reached. Player not online on server " + targetServerId + ": " + command);
+                            }
                         });
             } else {
-                // Überprüft, ob der Spieler online ist und führt den Befehl aus oder gibt eine Meldung aus, dass der Spieler nicht online ist
-                serverConnection.getPlayersConnected().stream()
-                        .filter(player -> player.getUsername().equals(command.split(" ")[1]))
-                        .findFirst()
-                        .ifPresentOrElse(player -> {
-                            sendCommandToBukkit(command, targetServerId, targetExecutor);
-                            verboseLogger.info("Executing command: " + command);
-                        }, () -> {
-                            verboseLogger.warn("Player is not online on server " + targetServerId + ": " + command);
-                            playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
-                        });
+                checkAndExecute(command, targetServerId, targetExecutor, playerMessage);
             }
+        });
+    }
+
+    private void checkAndExecute(String command, String targetServerId, String targetExecutor, Player playerMessage) {
+        server.getServer(targetServerId).ifPresent(serverConnection -> {
+            serverConnection.getPlayersConnected().stream()
+                    .filter(player -> player.getUsername().equals(command.split(" ")[1]))
+                    .findFirst()
+                    .ifPresentOrElse(player -> {
+                        sendCommandToBukkit(command, targetServerId, targetExecutor);
+                        verboseLogger.info("Executing command: " + command);
+                    }, () -> {
+                        verboseLogger.warn("Player is not online on server " + targetServerId + ": " + command);
+                        playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                    });
         });
     }
 

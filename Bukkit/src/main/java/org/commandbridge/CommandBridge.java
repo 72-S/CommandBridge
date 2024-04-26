@@ -2,16 +2,20 @@ package org.commandbridge;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
+
 public final class CommandBridge extends JavaPlugin {
 
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
-        String serverId = "REPLACE THIS WITH YOUR SERVER NAME";
-        getConfig().set("server-id", serverId);
-        getConfig().set("verbose-output", false);
-        saveConfig();
+        File configFile = new File(getDataFolder(), "config.yml");
+        if (!configFile.exists()) {
+            saveDefaultConfig();
+            getConfig().set("server-id", "REPLACE THIS WITH YOUR SERVER NAME");
+            getConfig().set("verbose-output", false);
+            saveConfig();
+        }
         VerboseLogger logger = new VerboseLogger(this);
         logger.loadConfig();
         logger.info("CommandBridge has been enabled!");

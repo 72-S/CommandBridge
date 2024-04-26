@@ -75,6 +75,7 @@ public class CommandBridge {
 
     private int reloadScripts(CommandContext<CommandSource> context, LoadScripts loadScripts) {
         loadScripts.loadScripts();
+        loadConfig();
         context.getSource().sendMessage(Component.text("Scripts reloaded!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
         return Command.SINGLE_SUCCESS;
     }
@@ -101,7 +102,7 @@ public class CommandBridge {
         try (FileInputStream fis = new FileInputStream(configFile)) {
             Yaml yaml = new Yaml(new Constructor(Map.class));
             Map<String, Object> data = yaml.load(fis);
-            this.verboseOutput = (boolean) data.getOrDefault("verboseOutput", false);
+            this.verboseOutput = (boolean) data.getOrDefault("verbose-output", false);
             verboseLogger.info("Config loaded. Verbose output is " + (this.verboseOutput ? "enabled" : "disabled"));
         } catch (IOException e) {
             verboseLogger.error("Failed to load config file", e);
