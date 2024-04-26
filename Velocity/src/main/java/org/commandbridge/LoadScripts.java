@@ -113,6 +113,8 @@ public class LoadScripts {
                         return 0;
                     }
 
+                    String playerUUID = player.getUniqueId().toString();
+
                     for (Map<String, Object> cmdData : commandList) {
                         String cmd = parsePlaceholders((String) cmdData.get("command"), player);
                         int delay = (int) cmdData.getOrDefault("delay", 0);
@@ -120,12 +122,13 @@ public class LoadScripts {
                         String targetExecutor = (String) cmdData.getOrDefault("target-executor", "console");
                         boolean waitForOnline = (boolean) cmdData.getOrDefault("wait-until-player-is-online", false);
 
+
                         if (delay > 0) {
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0)))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), playerUUID))
                                     .delay(delay, TimeUnit.SECONDS)
                                     .schedule();
                         } else {
-                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0));
+                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), playerUUID);
                         }
                     }
                     return 1;
@@ -142,18 +145,18 @@ public class LoadScripts {
         return command.replace("%player%", player.getUsername());
     }
 
-    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage, AtomicInteger timeElapsed) {
+    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage, AtomicInteger timeElapsed, String playerUUID) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
             if (waitForOnline) {
                 serverConnection.getPlayersConnected().stream()
-                        .filter(player -> player.getUsername().equals(command.split(" ")[1])) // Der Spielername ist das erste Argument im Befehl.
+                        .filter(player -> player.getUniqueId().toString().equals(playerUUID)) // Der Spielername ist das erste Argument im Befehl.
                         .findFirst()
                         .ifPresentOrElse(player -> {
                             sendCommandToBukkit(command, targetServerId, targetExecutor);
                             verboseLogger.info("Executing command on server " + targetServerId + ": " + command);
                         }, () -> {
                             if (timeElapsed.getAndIncrement() < 20) {
-                                server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage, timeElapsed))
+                                server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage, timeElapsed, playerUUID))
                                         .delay(1, TimeUnit.SECONDS)
                                         .schedule();
                                 verboseLogger.info("Waiting for player to be online on server " + targetServerId + ": " + command);
@@ -163,15 +166,17 @@ public class LoadScripts {
                             }
                         });
             } else {
-                checkAndExecute(command, targetServerId, targetExecutor, playerMessage);
+                checkAndExecute(command, targetServerId, targetExecutor, playerMessage, playerUUID);
             }
         });
     }
 
-    private void checkAndExecute(String command, String targetServerId, String targetExecutor, Player playerMessage) {
+    private void checkAndExecute(String command, String targetServerId, String targetExecutor, Player playerMessage, String playerUUID) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
+            verboseLogger.warn("Player UUID: " + playerUUID);
+
             serverConnection.getPlayersConnected().stream()
-                    .filter(player -> player.getUsername().equals(command.split(" ")[1]))
+                    .filter(player -> player.getUniqueId().toString().equals(playerUUID))
                     .findFirst()
                     .ifPresentOrElse(player -> {
                         sendCommandToBukkit(command, targetServerId, targetExecutor);
