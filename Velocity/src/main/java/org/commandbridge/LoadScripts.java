@@ -158,7 +158,7 @@ public class LoadScripts {
                                         .schedule();
                                 verboseLogger.info("Waiting for player to be online on server " + targetServerId + ": " + command);
                             } else {
-                                playerMessage.sendMessage(Component.text("Timeout reached. Player not online within 30 seconds on server " + targetServerId, net.kyori.adventure.text.format.NamedTextColor.RED));
+                                playerMessage.sendMessage(Component.text("Timeout reached. Player not online within 20 seconds on server " + targetServerId, net.kyori.adventure.text.format.NamedTextColor.RED));
                                 verboseLogger.warn("Timeout reached. Player not online on server " + targetServerId + ": " + command);
                             }
                         });
