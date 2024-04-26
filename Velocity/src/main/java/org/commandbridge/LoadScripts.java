@@ -1,10 +1,14 @@
 package org.commandbridge;
 
 import com.google.inject.Inject;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.velocitypowered.api.command.BrigadierCommand;
+import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+import net.kyori.adventure.text.Component;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.Yaml;
 
@@ -94,33 +98,43 @@ public class LoadScripts {
             logger.warn("Command name or command list is missing or empty in config.");
             return;
         }
-        registeredCommands.add(commandName);
-        server.getCommandManager().register(commandName, new SimpleCommand() {
-            @Override
-            public void execute(Invocation invocation) {
-                if (!(invocation.source() instanceof Player)) {
-                    logger.warn("This command can only be used by a player.");
-                    return;
-                }
-                Player player = (Player) invocation.source();
 
-                for (Map<String, Object> cmdData : commandList) {
-                    String cmd = parsePlaceholders((String) cmdData.get("command"), player);
-                    int delay = (int) cmdData.getOrDefault("delay", 0);
-                    String targetServerId = (String) cmdData.get("target-server-id");
-                    String targetExecutor = (String) cmdData.getOrDefault("target-executor", "console");
-
-                    if (delay > 0) {
-                        server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor))
-                                .delay(delay, TimeUnit.SECONDS)
-                                .schedule();
-                    } else {
-                        executeCommand(cmd, targetServerId, targetExecutor);
+        LiteralCommandNode<CommandSource> rootNode = BrigadierCommand.literalArgumentBuilder(commandName)
+                .requires(source -> source instanceof Player)
+                .executes(context -> {
+                    CommandSource source = context.getSource();
+                    if (!(source instanceof Player)) {
+                        logger.warn("This command can only be used by a player.");
+                        return 0;
                     }
-                }
-            }
-        }, commandName);
+                    Player player = (Player) source;
 
+                    if (!player.hasPermission("commandbridge.command." + commandName)) {
+                        player.sendMessage(Component.text("You do not have permission to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                        return 0;
+                    }
+
+                    for (Map<String, Object> cmdData : commandList) {
+                        String cmd = parsePlaceholders((String) cmdData.get("command"), player);
+                        int delay = (int) cmdData.getOrDefault("delay", 0);
+                        String targetServerId = (String) cmdData.get("target-server-id");
+                        String targetExecutor = (String) cmdData.getOrDefault("target-executor", "console");
+
+                        if (delay > 0) {
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor))
+                                    .delay(delay, TimeUnit.SECONDS)
+                                    .schedule();
+                        } else {
+                            executeCommand(cmd, targetServerId, targetExecutor);
+                        }
+                    }
+                    return 1;
+                })
+                .build();
+
+        BrigadierCommand brigadierCommand = new BrigadierCommand(rootNode);
+        server.getCommandManager().register(brigadierCommand);
+        registeredCommands.add(commandName);
         logger.info("Command '{}' registered successfully.", commandName);
     }
 
@@ -129,7 +143,6 @@ public class LoadScripts {
     }
 
     private void executeCommand(String command, String targetServerId, String targetExecutor) {
-        // Method to send the command to Bukkit servers
         sendCommandToBukkit(command, targetServerId, targetExecutor);
         logger.info("Executing command: '{}'", command);
     }
