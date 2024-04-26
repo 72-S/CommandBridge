@@ -1,19 +1,12 @@
 package org.commandbridge;
 
 import org.bukkit.plugin.java.JavaPlugin;
-import org.yaml.snakeyaml.Yaml;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Map;
-
-public class Logger {
+public class VerboseLogger {
     private boolean verboseOutput;
     private final JavaPlugin plugin;
 
-    public Logger(JavaPlugin plugin) {
+    public VerboseLogger(JavaPlugin plugin) {
         this.plugin = plugin;
     }
 

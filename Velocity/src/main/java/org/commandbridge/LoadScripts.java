@@ -102,11 +102,10 @@ public class LoadScripts {
                 .requires(source -> source instanceof Player)
                 .executes(context -> {
                     CommandSource source = context.getSource();
-                    if (!(source instanceof Player)) {
+                    if (!(source instanceof Player player)) {
                         verboseLogger.warn("This command can only be used by a player.");
                         return 0;
                     }
-                    Player player = (Player) source;
 
                     if (!player.hasPermission("commandbridge.command." + commandName)) {
                         player.sendMessage(Component.text("You do not have permission to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));

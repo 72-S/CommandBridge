@@ -1,9 +1,18 @@
-name: join
-enabled: true
+name: examplecommand
+enabled: false
 commands:
   - command: "title %player% title {\"text\":\"Command Bridge is the Way to Go!\"}"
     delay: 0
     target-server-id: "lobby"
+    target-executor: "console"
+    wait-until-player-is-online: false
+  - command: "say %player% has joined the server!"
+    delay: 0
+    target-server-id: "lobby"
     target-executor: "player"
     wait-until-player-is-online: false
-
+  - command: "server lobby"
+    delay: 0
+    target-server-id: "lobby"
+    target-executor: "player"
+    wait-until-player-is-online: false

@@ -10,16 +10,16 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 
-public class BukkitMessageListener implements PluginMessageListener {
+public class MessageListener implements PluginMessageListener {
     private final JavaPlugin plugin;
 
-    public BukkitMessageListener(JavaPlugin plugin) {
+    public MessageListener(JavaPlugin plugin) {
         this.plugin = plugin;
     }
 
     @Override
     public void onPluginMessageReceived(@NotNull String channel, @NotNull Player player, byte[] message) {
-        Logger logger = new Logger(plugin);
+        VerboseLogger logger = new VerboseLogger(plugin);
         logger.info("Received plugin message on channel " + channel);
         if (!"commandbridge:main".equals(channel)) return;
         try (ByteArrayInputStream stream = new ByteArrayInputStream(message);
@@ -36,7 +36,7 @@ public class BukkitMessageListener implements PluginMessageListener {
                     return;
                 }
 
-                if ("player".equals(targetExecutor) && player != null) {
+                if ("player".equals(targetExecutor)) {
                     logger.info("Executing command as player: " + command);
                     Bukkit.dispatchCommand(player, command);
                 } else if ("console".equals(targetExecutor)) {
