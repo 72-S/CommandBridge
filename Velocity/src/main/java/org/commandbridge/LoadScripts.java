@@ -4,12 +4,10 @@ import com.google.inject.Inject;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
-import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import net.kyori.adventure.text.Component;
-import org.slf4j.Logger;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
@@ -24,16 +22,17 @@ import java.util.concurrent.TimeUnit;
 public class LoadScripts {
 
     private final ProxyServer server;
-    private final Logger logger;
+    private final VerboseLogger verboseLogger;
     private final CommandBridge plugin;
     private final File scriptsFolder;
     private final Path dataDirectory = Path.of("plugins", "CommandBridgeVelocity");
     private final List<String> registeredCommands = new ArrayList<>();
+    
 
     @Inject
-    public LoadScripts(ProxyServer server, Logger logger, CommandBridge plugin) {
+    public LoadScripts(ProxyServer server, CommandBridge plugin) {
         this.server = server;
-        this.logger = logger;
+        this.verboseLogger = plugin.getVerboseLogger();
         this.plugin = plugin;
         this.scriptsFolder = new File("plugins/CommandBridgeVelocity/scripts");
         copyExampleYml();
@@ -47,15 +46,15 @@ public class LoadScripts {
             if (Files.notExists(exampleScript)) {
                 try (InputStream in = getClass().getClassLoader().getResourceAsStream("example.yml")) {
                     if (in == null) {
-                        logger.warn("Could not find example.yml in resources");
+                        verboseLogger.warn("Could not find example.yml in resources");
                         return;
                     }
                     Files.copy(in, exampleScript, StandardCopyOption.REPLACE_EXISTING);
-                    logger.info("example.yml has been copied successfully.");
+                    verboseLogger.info("example.yml has been copied successfully.");
                 }
             }
         } catch (IOException e) {
-            logger.error("Failed to create scripts folder or copy example.yml", e);
+            verboseLogger.error("Failed to create scripts folder or copy example.yml", e);
         }
     }
 
@@ -63,7 +62,7 @@ public class LoadScripts {
         unloadScripts();  // Deregister all commands before loading new ones
         File[] files = scriptsFolder.listFiles((dir, name) -> name.endsWith(".yml"));
         if (files == null) {
-            logger.info("No scripts found.");
+            verboseLogger.info("No scripts found.");
             return;
         }
 
@@ -74,10 +73,10 @@ public class LoadScripts {
                 if (Boolean.TRUE.equals(data.get("enabled"))) {
                     registerCommand(data);
                 } else {
-                    logger.info("Skipping disabled command in {}", file.getName());
+                    verboseLogger.info("Skipping disabled command in: " + file.getName());
                 }
             } catch (Exception e) {
-                logger.error("Failed to load or parse script file: {}", file.getName(), e);
+                verboseLogger.error("Failed to load or parse script file: " + file.getName(), e);
             }
         }
     }
@@ -86,7 +85,7 @@ public class LoadScripts {
         // Method to unload scripts
         for (String command : registeredCommands) {
             server.getCommandManager().unregister(command);
-            logger.info("Command '{}' unregistered successfully.", command);
+            verboseLogger.info("Command " + command + " unregistered successfully.");
         }
         registeredCommands.clear();
     }
@@ -95,7 +94,7 @@ public class LoadScripts {
         String commandName = (String) commandData.get("name");
         List<Map<String, Object>> commandList = (List<Map<String, Object>>) commandData.get("commands");
         if (commandName == null || commandList == null || commandList.isEmpty()) {
-            logger.warn("Command name or command list is missing or empty in config.");
+            verboseLogger.warn("Command name or command list is missing or empty in config.");
             return;
         }
 
@@ -104,7 +103,7 @@ public class LoadScripts {
                 .executes(context -> {
                     CommandSource source = context.getSource();
                     if (!(source instanceof Player)) {
-                        logger.warn("This command can only be used by a player.");
+                        verboseLogger.warn("This command can only be used by a player.");
                         return 0;
                     }
                     Player player = (Player) source;
@@ -136,7 +135,7 @@ public class LoadScripts {
         BrigadierCommand brigadierCommand = new BrigadierCommand(rootNode);
         server.getCommandManager().register(brigadierCommand);
         registeredCommands.add(commandName);
-        logger.info("Command '{}' registered successfully.", commandName);
+        verboseLogger.info("Command " + commandName + " registered successfully.");
     }
 
     private String parsePlaceholders(String command, Player player) {
@@ -152,13 +151,13 @@ public class LoadScripts {
                         .findFirst()
                         .ifPresentOrElse(player -> {
                             sendCommandToBukkit(command, targetServerId, targetExecutor);
-                            logger.info("Executing command on server {}: {}", targetServerId, command);
+                            verboseLogger.info("Executing command on server " + targetServerId + ": " + command);
                         }, () -> {
                             // Spieler ist nicht online, warte und versuche es erneut.
                             server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage))
                                     .delay(1, TimeUnit.SECONDS)
                                     .schedule();
-                            logger.info("Waiting for player to be online on server {}: {}", targetServerId, command);
+                            verboseLogger.info("Waiting for player to be online on server "+ targetServerId + ": " +  command);
                         });
             } else {
                 // Überprüft, ob der Spieler online ist und führt den Befehl aus oder gibt eine Meldung aus, dass der Spieler nicht online ist
@@ -167,9 +166,9 @@ public class LoadScripts {
                         .findFirst()
                         .ifPresentOrElse(player -> {
                             sendCommandToBukkit(command, targetServerId, targetExecutor);
-                            logger.info("Executing command: '{}'", command);
+                            verboseLogger.info("Executing command: " + command);
                         }, () -> {
-                            logger.warn("Player is not online on server {}: {}", targetServerId, command);
+                            verboseLogger.warn("Player is not online on server " + targetServerId + ": " + command);
                             playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
                         });
             }
@@ -190,10 +189,10 @@ public class LoadScripts {
                     .filter(serverConnection -> serverConnection.getServerInfo().getName().equals(targetServerId))
                     .forEach(serverConnection -> {
                         serverConnection.sendPluginMessage(MinecraftChannelIdentifier.create("commandbridge", "main"), byteOut.toByteArray());
-                        logger.info("Command sent to Bukkit server {}: {}", targetServerId, command);
+                        verboseLogger.info("Command sent to Bukkit server " + targetServerId + ": " + command);
                     });
         } catch (IOException e) {
-            logger.error("Failed to send command to Bukkit", e);
+            verboseLogger.error("Failed to send command to Bukkit", e);
         }
     }
 

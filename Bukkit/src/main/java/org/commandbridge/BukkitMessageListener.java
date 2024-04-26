@@ -5,10 +5,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
 
 
 public class BukkitMessageListener implements PluginMessageListener {
@@ -20,32 +19,33 @@ public class BukkitMessageListener implements PluginMessageListener {
 
     @Override
     public void onPluginMessageReceived(@NotNull String channel, @NotNull Player player, byte[] message) {
+        Logger logger = new Logger(plugin);
+        logger.info("Received plugin message on channel " + channel);
         if (!"commandbridge:main".equals(channel)) return;
         try (ByteArrayInputStream stream = new ByteArrayInputStream(message);
              DataInputStream in = new DataInputStream(stream)) {
             String subChannel = in.readUTF();
             if ("ExecuteCommand".equals(subChannel)) {
-                String targetServerId = in.readUTF();  // Lese die Zielserver-ID
-                String targetExecutor = in.readUTF();  // Lese den Ziel-Ausführenden
-                String command = in.readUTF();         // Lese den Befehl
+                String targetServerId = in.readUTF();
+                String targetExecutor = in.readUTF();
+                String command = in.readUTF();
+                logger.info("Received command to execute on server " + targetServerId + " as " + targetExecutor + ": " + command);
 
-                // Prüfe, ob der Befehl für diesen Server bestimmt ist
                 if (!targetServerId.equals(plugin.getConfig().getString("server-id"))) {
-                    plugin.getLogger().info("Command not for this server, ignoring.");
+                    logger.info("Command not for this server, ignoring.");
                     return;
                 }
 
-                // Führe den Befehl aus, abhängig vom Ziel-Ausführenden
                 if ("player".equals(targetExecutor) && player != null) {
-                    plugin.getLogger().info("Executing command as player: " + command);
+                    logger.info("Executing command as player: " + command);
                     Bukkit.dispatchCommand(player, command);
-                } else if ("console".equals(targetExecutor)){
-                    plugin.getLogger().info("Executing command as console: " + command);
+                } else if ("console".equals(targetExecutor)) {
+                    logger.info("Executing command as console: " + command);
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
                 }
             }
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to read plugin message: " + e.getMessage());
+            logger.error("Failed to read plugin message" , e);
         }
     }
 
