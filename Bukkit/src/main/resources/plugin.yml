@@ -2,3 +2,6 @@ name: CommandBridge
 version: '${project.version}'
 main: org.commandbridge.CommandBridge
 api-version: '1.20'
+author: '72S_'
+description: 'A bridge between Velocity and Bukkit'
+website: 'https://github.com/72-S'

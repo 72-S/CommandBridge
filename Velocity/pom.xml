@@ -28,24 +28,21 @@
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.2.0</version>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <goals>
-                                    <goal>jar-no-fork</goal>
-                                </goals>
-                            </execution>
-                        </executions>
+                        <configuration>
+                            <show>protected</show>
+                            <show>package</show>
+                            <show>private</show>
+                        </configuration>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>3.2.0</version>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.2.1</version>
                         <executions>
                             <execution>
-                                <id>attach-javadocs</id>
+                                <id>attach-sources</id>
                                 <goals>
                                     <goal>jar</goal>
                                 </goals>
@@ -66,11 +63,26 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-deploy-plugin</artifactId>
+                        <version>3.0.0-M1</version>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-site-plugin</artifactId>
+                        <version>3.9.1</version>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/site</outputDirectory>
+                        </configuration>
+                    </plugin>
                 </plugins>
                 <resources>
                   <resource>
                     <directory>src/main/resources</directory>
-                    <filtering>true</filtering>
                   </resource>
                 </resources>
             </build>
@@ -81,7 +93,6 @@
         <resources>
             <resource>
                 <directory>${project.basedir}/src/main/resources</directory>
-                <filtering>true</filtering>
             </resource>
         </resources>
         <plugins>

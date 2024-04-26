@@ -1,0 +1,8 @@
+name: join
+enabled: true
+commands:
+  - command: "title %player% title {\"text\":\"Welcome to the server!\"}"
+    delay: 0
+    target-server-id: "lobby"
+    target-executor: "player"
+
