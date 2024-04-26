@@ -1,8 +1,9 @@
 name: join
 enabled: true
 commands:
-  - command: "title %player% title {\"text\":\"Welcome to the server!\"}"
+  - command: "title %player% title {\"text\":\"Command Bridge is the Way to Go!\"}"
     delay: 0
     target-server-id: "lobby"
     target-executor: "player"
+    wait-until-player-is-online: false
 

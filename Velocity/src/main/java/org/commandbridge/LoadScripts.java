@@ -119,13 +119,14 @@ public class LoadScripts {
                         int delay = (int) cmdData.getOrDefault("delay", 0);
                         String targetServerId = (String) cmdData.get("target-server-id");
                         String targetExecutor = (String) cmdData.getOrDefault("target-executor", "console");
+                        boolean waitForOnline = (boolean) cmdData.getOrDefault("wait-until-player-is-online", false);
 
                         if (delay > 0) {
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline))
                                     .delay(delay, TimeUnit.SECONDS)
                                     .schedule();
                         } else {
-                            executeCommand(cmd, targetServerId, targetExecutor);
+                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline);
                         }
                     }
                     return 1;
@@ -142,10 +143,38 @@ public class LoadScripts {
         return command.replace("%player%", player.getUsername());
     }
 
-    private void executeCommand(String command, String targetServerId, String targetExecutor) {
-        sendCommandToBukkit(command, targetServerId, targetExecutor);
-        logger.info("Executing command: '{}'", command);
+    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline) {
+        server.getServer(targetServerId).ifPresent(serverConnection -> {
+            if (waitForOnline) {
+                // Überprüft, ob der Spieler online ist und führt den Befehl aus oder plant eine erneute Überprüfung
+                serverConnection.getPlayersConnected().stream()
+                        .filter(player -> player.getUsername().equals(command.split(" ")[1])) // Annahme: Der Spielername ist das erste Argument nach dem Befehl.
+                        .findFirst()
+                        .ifPresentOrElse(player -> {
+                            sendCommandToBukkit(command, targetServerId, targetExecutor);
+                            logger.info("Executing command on server {}: {}", targetServerId, command);
+                        }, () -> {
+                            // Spieler ist nicht online, warte und versuche es erneut.
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true))
+                                    .delay(1, TimeUnit.SECONDS)
+                                    .schedule();
+                            logger.info("Waiting for player to be online on server {}: {}", targetServerId, command);
+                        });
+            } else {
+                // Überprüft, ob der Spieler online ist und führt den Befehl aus oder gibt eine Meldung aus, dass der Spieler nicht online ist
+                serverConnection.getPlayersConnected().stream()
+                        .filter(player -> player.getUsername().equals(command.split(" ")[1]))
+                        .findFirst()
+                        .ifPresentOrElse(player -> {
+                            sendCommandToBukkit(command, targetServerId, targetExecutor);
+                            logger.info("Executing command: '{}'", command);
+                        }, () -> {
+                            logger.warn("Player is not online on server {}: {}", targetServerId, command);
+                        });
+            }
+        });
     }
+
 
     private void sendCommandToBukkit(String command, String targetServerId, String targetExecutor) {
         // Implementation to send the command to the Bukkit server
