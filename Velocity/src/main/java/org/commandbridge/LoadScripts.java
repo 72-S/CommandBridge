@@ -122,11 +122,11 @@ public class LoadScripts {
                         boolean waitForOnline = (boolean) cmdData.getOrDefault("wait-until-player-is-online", false);
 
                         if (delay > 0) {
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player))
                                     .delay(delay, TimeUnit.SECONDS)
                                     .schedule();
                         } else {
-                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline);
+                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player);
                         }
                     }
                     return 1;
@@ -143,7 +143,7 @@ public class LoadScripts {
         return command.replace("%player%", player.getUsername());
     }
 
-    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline) {
+    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
             if (waitForOnline) {
                 // Überprüft, ob der Spieler online ist und führt den Befehl aus oder plant eine erneute Überprüfung
@@ -155,7 +155,7 @@ public class LoadScripts {
                             logger.info("Executing command on server {}: {}", targetServerId, command);
                         }, () -> {
                             // Spieler ist nicht online, warte und versuche es erneut.
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage))
                                     .delay(1, TimeUnit.SECONDS)
                                     .schedule();
                             logger.info("Waiting for player to be online on server {}: {}", targetServerId, command);
@@ -170,6 +170,7 @@ public class LoadScripts {
                             logger.info("Executing command: '{}'", command);
                         }, () -> {
                             logger.warn("Player is not online on server {}: {}", targetServerId, command);
+                            playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
                         });
             }
         });
