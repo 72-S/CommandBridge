@@ -91,29 +91,40 @@ public class LoadScripts {
         registeredCommands.clear();
     }
 
+
+
+
     private void registerCommand(Map<String, Object> commandData) {
         String commandName = (String) commandData.get("name");
         List<Map<String, Object>> commandList = (List<Map<String, Object>>) commandData.get("commands");
+        boolean disableExecutorIsPlayerCheck = (boolean) commandData.getOrDefault("disable-check-if-executor-is-player", false);
+        if (disableExecutorIsPlayerCheck) {
+            verboseLogger.warn("Executor is player check is disabled for command " + commandName);
+        } else {
+            verboseLogger.info("Executor is player check is enabled for command " + commandName);
+        }
+
         if (commandName == null || commandList == null || commandList.isEmpty()) {
             verboseLogger.warn("Command name or command list is missing or empty in config.");
             return;
         }
 
         LiteralCommandNode<CommandSource> rootNode = BrigadierCommand.literalArgumentBuilder(commandName)
-                .requires(source -> source instanceof Player)
+                .requires(source -> disableExecutorIsPlayerCheck || source instanceof Player)
                 .executes(context -> {
                     CommandSource source = context.getSource();
-                    if (!(source instanceof Player player)) {
+
+                    // Prüfe Berechtigungen und ob der Befehl von einem Spieler ausgeführt werden muss, wenn nicht deaktiviert
+                    if (!disableExecutorIsPlayerCheck && !(source instanceof Player player)) {
                         verboseLogger.warn("This command can only be used by a player.");
                         return 0;
                     }
+                    Player player = (Player) source; // Casting sicher durchführen
 
-                    if (!player.hasPermission("commandbridge.command." + commandName)) {
-                        player.sendMessage(Component.text("You do not have permission to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                    if (!source.hasPermission("commandbridge.command." + commandName)) {
+                        source.sendMessage(Component.text("You do not have permission to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
                         return 0;
                     }
-
-                    String playerUUID = player.getUniqueId().toString();
 
                     for (Map<String, Object> cmdData : commandList) {
                         String cmd = parsePlaceholders((String) cmdData.get("command"), player);
@@ -121,14 +132,21 @@ public class LoadScripts {
                         String targetServerId = (String) cmdData.get("target-server-id");
                         String targetExecutor = (String) cmdData.getOrDefault("target-executor", "console");
                         boolean waitForOnline = (boolean) cmdData.getOrDefault("wait-until-player-is-online", false);
+                        boolean disablePlayerOnline = (boolean) cmdData.getOrDefault("disable-check-if-executor-is-on-server", false);
 
+                        if (disablePlayerOnline) {
+                            verboseLogger.warn("Player online check is disabled for command " + commandName);
+                        } else {
+                            verboseLogger.info("Player online check is enabled for command " + commandName);
+                        }
 
+                        // Ausführen des Befehls sofort oder verzögert
                         if (delay > 0) {
-                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), playerUUID))
+                            server.getScheduler().buildTask(plugin, () -> executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), player.getUniqueId().toString(), disablePlayerOnline))
                                     .delay(delay, TimeUnit.SECONDS)
                                     .schedule();
                         } else {
-                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), playerUUID);
+                            executeCommand(cmd, targetServerId, targetExecutor, waitForOnline, player, new AtomicInteger(0), player.getUniqueId().toString(), disablePlayerOnline);
                         }
                     }
                     return 1;
@@ -141,11 +159,17 @@ public class LoadScripts {
         verboseLogger.info("Command " + commandName + " registered successfully.");
     }
 
+
     private String parsePlaceholders(String command, Player player) {
-        return command.replace("%player%", player.getUsername());
+        return command.replace("%player%", player.getUsername())
+                .replace("%uuid%", player.getUniqueId().toString())
+                .replace("%server%", player.getCurrentServer().get().getServerInfo().getName());
     }
 
-    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage, AtomicInteger timeElapsed, String playerUUID) {
+
+    //TODO: make exeption option that the player can execute the command if not online
+
+    private void executeCommand(String command, String targetServerId, String targetExecutor, boolean waitForOnline, Player playerMessage, AtomicInteger timeElapsed, String playerUUID, boolean disable_player_online) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
             if (waitForOnline) {
                 serverConnection.getPlayersConnected().stream()
@@ -156,7 +180,7 @@ public class LoadScripts {
                             verboseLogger.info("Executing command on server " + targetServerId + ": " + command);
                         }, () -> {
                             if (timeElapsed.getAndIncrement() < 20) {
-                                server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage, timeElapsed, playerUUID))
+                                server.getScheduler().buildTask(plugin, () -> executeCommand(command, targetServerId, targetExecutor, true, playerMessage, timeElapsed, playerUUID, disable_player_online))
                                         .delay(1, TimeUnit.SECONDS)
                                         .schedule();
                                 verboseLogger.info("Waiting for player to be online on server " + targetServerId + ": " + command);
@@ -166,25 +190,32 @@ public class LoadScripts {
                             }
                         });
             } else {
-                checkAndExecute(command, targetServerId, targetExecutor, playerMessage, playerUUID);
+                checkAndExecute(command, targetServerId, targetExecutor, playerMessage, playerUUID, disable_player_online);
             }
         });
     }
 
-    private void checkAndExecute(String command, String targetServerId, String targetExecutor, Player playerMessage, String playerUUID) {
+    private void checkAndExecute(String command, String targetServerId, String targetExecutor, Player playerMessage, String playerUUID, boolean disable_player_online) {
         server.getServer(targetServerId).ifPresent(serverConnection -> {
             verboseLogger.warn("Player UUID: " + playerUUID);
 
-            serverConnection.getPlayersConnected().stream()
-                    .filter(player -> player.getUniqueId().toString().equals(playerUUID))
-                    .findFirst()
-                    .ifPresentOrElse(player -> {
-                        sendCommandToBukkit(command, targetServerId, targetExecutor);
-                        verboseLogger.info("Executing command: " + command);
-                    }, () -> {
-                        verboseLogger.warn("Player is not online on server " + targetServerId + ": " + command);
-                        playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
-                    });
+
+            if (disable_player_online) {
+                sendCommandToBukkit(command, targetServerId, targetExecutor);
+                verboseLogger.info("Executing command: " + command);
+
+            } else {
+                serverConnection.getPlayersConnected().stream()
+                        .filter(player -> player.getUniqueId().toString().equals(playerUUID))
+                        .findFirst()
+                        .ifPresentOrElse(player -> {
+                            sendCommandToBukkit(command, targetServerId, targetExecutor);
+                            verboseLogger.info("Executing command: " + command);
+                        }, () -> {
+                            verboseLogger.warn("Player is not online on server " + targetServerId + ": " + command);
+                            playerMessage.sendMessage(Component.text("You must be on the server " + targetServerId + " to use this command.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                        });
+            }
         });
     }
 
